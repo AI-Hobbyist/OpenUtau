@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,8 +19,8 @@ namespace OpenUtau.Core.DiffSinger
         string rootPath;
         DsConfig dsConfig;
         List<string> phonemes;
-        InferenceSession linguisticModel;
-        InferenceSession pitchModel;
+        IOnnxInferenceSession linguisticModel;
+        IOnnxInferenceSession pitchModel;
         IG2p g2p;
         float frameMs;
         DiffSingerSpeakerEmbedManager speakerEmbedManager;

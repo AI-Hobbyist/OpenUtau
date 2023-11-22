@@ -36,6 +36,7 @@ namespace OpenUtau.App.ViewModels {
         [Reactive] public int NumRenderThreads { get; set; }
         public List<string> OnnxRunnerOptions { get; set; }
         [Reactive] public string OnnxRunner { get; set; }
+        [Reactive] public string OnnxRemoteUrl { get; set; }
         public List<GpuInfo> OnnxGpuOptions { get; set; }
         [Reactive] public GpuInfo OnnxGpu { get; set; }
         public List<int> DiffsingerSpeedupOptions { get; } = new List<int> { 1, 5, 10, 20, 50, 100 };
@@ -132,6 +133,8 @@ namespace OpenUtau.App.ViewModels {
             OnnxRunnerOptions = Onnx.getRunnerOptions();
             OnnxRunner = String.IsNullOrEmpty(Preferences.Default.OnnxRunner) ?
                OnnxRunnerOptions[0] : Preferences.Default.OnnxRunner;
+            OnnxRemoteUrl = String.IsNullOrEmpty(Preferences.Default.OnnxRemoteUrl) ?
+                "http://localhost:7889" : Preferences.Default.OnnxRemoteUrl;
             OnnxGpuOptions = Onnx.getGpuInfo();
             OnnxGpu = OnnxGpuOptions.FirstOrDefault(x => x.deviceId == Preferences.Default.OnnxGpu, OnnxGpuOptions[0]);
             DiffSingerDepth = Preferences.Default.DiffSingerDepth;
@@ -264,6 +267,11 @@ namespace OpenUtau.App.ViewModels {
             this.WhenAnyValue(vm => vm.OnnxRunner)
                 .Subscribe(index => {
                     Preferences.Default.OnnxRunner = index;
+                    Preferences.Save();
+                });
+            this.WhenAnyValue(vm => vm.OnnxRemoteUrl)
+                .Subscribe(url => {
+                    Preferences.Default.OnnxRemoteUrl = url;
                     Preferences.Save();
                 });
             this.WhenAnyValue(vm => vm.OnnxGpu)

@@ -6,7 +6,7 @@ namespace OpenUtau.Core.DiffSinger {
     public class DsVocoder {
         public string Location;
         public DsVocoderConfig config;
-        public InferenceSession session;
+        public IOnnxInferenceSession session;
 
         //Get vocoder by package name
         public DsVocoder(string name) {
@@ -16,12 +16,12 @@ namespace OpenUtau.Core.DiffSinger {
                 config = Core.Yaml.DefaultDeserializer.Deserialize<DsVocoderConfig>(
                     File.ReadAllText(Path.Combine(Location, "vocoder.yaml"),
                         System.Text.Encoding.UTF8));
-                model = File.ReadAllBytes(Path.Combine(Location, config.model));
+                //model = File.ReadAllBytes(Path.Combine(Location, config.model));
             }
             catch (Exception ex) {
                 throw new Exception($"Error loading vocoder {name}. Please download vocoder from https://github.com/xunmengshe/OpenUtau/wiki/Vocoders");
             }
-            session = Onnx.getInferenceSession(model);
+            session = Onnx.getInferenceSession(Path.Combine(Location, config.model));
         }
 
         public float frameMs() {

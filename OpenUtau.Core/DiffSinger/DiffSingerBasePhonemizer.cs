@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,8 +17,8 @@ namespace OpenUtau.Core.DiffSinger
         DsConfig dsConfig;
         string rootPath;
         float frameMs;
-        InferenceSession linguisticModel;
-        InferenceSession durationModel;
+        IOnnxInferenceSession linguisticModel;
+        IOnnxInferenceSession durationModel;
         IG2p g2p;
         List<string> phonemes;
         DiffSingerSpeakerEmbedManager speakerEmbedManager;
@@ -50,14 +50,14 @@ namespace OpenUtau.Core.DiffSinger
             //Load models
             var linguisticModelPath = Path.Join(rootPath, dsConfig.linguistic);
             try {
-                linguisticModel = new InferenceSession(linguisticModelPath);
+                linguisticModel = Onnx.getInferenceSession(linguisticModelPath);
             } catch (Exception e) {
                 Log.Error(e, $"failed to load linguistic model from {linguisticModelPath}");
                 return;
             }
             var durationModelPath = Path.Join(rootPath, dsConfig.dur);
             try {
-                durationModel = new InferenceSession(durationModelPath);
+                durationModel = Onnx.getInferenceSession(durationModelPath);
             } catch (Exception e) {
                 Log.Error(e, $"failed to load duration model from {durationModelPath}");
                 return;

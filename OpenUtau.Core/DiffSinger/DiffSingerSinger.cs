@@ -42,7 +42,7 @@ namespace OpenUtau.Core.DiffSinger {
 
         public List<string> phonemes = new List<string>();
         public DsConfig dsConfig;
-        public InferenceSession acousticSession = null;
+        public IOnnxInferenceSession acousticSession = null;
         public DsVocoder vocoder = null;
         public DsPitch pitchPredictor = null;
         public DiffSingerSpeakerEmbedManager speakerEmbedManager = null;
@@ -122,7 +122,7 @@ namespace OpenUtau.Core.DiffSinger {
                 : File.ReadAllBytes(Portrait);
         }
 
-        public InferenceSession getAcousticSession() {
+        public IOnnxInferenceSession getAcousticSession() {
             if (acousticSession is null) {
                 acousticSession = Onnx.getInferenceSession(Path.Combine(Location, dsConfig.acoustic));
             }
