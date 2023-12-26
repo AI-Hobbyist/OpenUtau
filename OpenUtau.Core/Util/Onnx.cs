@@ -19,13 +19,13 @@ namespace OpenUtau.Core {
         }
     }
     public abstract class IOnnxInferenceSession : IDisposable {
+        public InferenceSession session;
         public abstract IReadOnlyCollection<NamedOnnxValue> Run(IReadOnlyCollection<NamedOnnxValue> inputs);
         public abstract void Dispose();
     }
 
     class LocalInferenceSession : IOnnxInferenceSession {
         private bool _disposed = false;
-        InferenceSession session;
         public LocalInferenceSession(InferenceSession session) {
             this.session = session;
         }
@@ -73,9 +73,10 @@ namespace OpenUtau.Core {
         private bool _disposed = false;
         string url;
         string modelPath;
-        public RemoteInferenceSession(string url, string modelPath) {
+        public RemoteInferenceSession(string url, string modelPath, InferenceSession session) {
             this.url = url;
             this.modelPath = modelPath;
+            this.session = session;
         }
 
         public override IReadOnlyCollection<NamedOnnxValue> Run(IReadOnlyCollection<NamedOnnxValue> inputs) {
@@ -182,7 +183,7 @@ namespace OpenUtau.Core {
 
             // Send request
             string reqStr = JsonConvert.SerializeObject(remoteInputs);
-            string apiUrl = url + "/onnx/" + HttpUtility.UrlEncode(modelPath);
+            string apiUrl = url + "/inference/" + HttpUtility.UrlEncode(modelPath);
 
             using (var client = new System.Net.WebClient()) {
                 client.Headers.Add("Content-Type", "application/json");
@@ -315,7 +316,7 @@ namespace OpenUtau.Core {
         public static IOnnxInferenceSession getInferenceSession(string modelPath) {
             var (runner, options) = getOnnxSessionOptions();
             if (runner == "remote") {
-                return new RemoteInferenceSession(Preferences.Default.OnnxRemoteUrl, modelPath);
+                return new RemoteInferenceSession(Preferences.Default.OnnxRemoteUrl, modelPath, new InferenceSession(modelPath, options));
             } else {
                 return new LocalInferenceSession(new InferenceSession(modelPath, options));
             }

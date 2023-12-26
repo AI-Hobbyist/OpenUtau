@@ -121,7 +121,7 @@ namespace OpenUtau.Core.DiffSinger
                     .Reshape(new int[] { 1, ph_dur.Length })));
             }
 
-            Onnx.VerifyInputNames(linguisticModel, linguisticInputs);
+            Onnx.VerifyInputNames(linguisticModel.session, linguisticInputs);
             var linguisticOutputs = linguisticModel.Run(linguisticInputs);
             Tensor<float> encoder_out = linguisticOutputs
                 .Where(o => o.Name == "encoder_out")
@@ -259,7 +259,7 @@ namespace OpenUtau.Core.DiffSinger
                 .Reshape(new int[] { 1, note_rest.Count })));
             }
 
-            Onnx.VerifyInputNames(pitchModel, pitchInputs);
+            Onnx.VerifyInputNames(pitchModel.session, pitchInputs);
             var pitchOutputs = pitchModel.Run(pitchInputs);
             var pitch_out = pitchOutputs.First().AsTensor<float>().ToArray();
             var pitchEnd = phrase.timeAxis.MsPosToTickPos(startMs + (totalFrames - 1) * frameMs) - phrase.position;
