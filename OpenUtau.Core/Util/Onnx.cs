@@ -69,19 +69,25 @@ namespace OpenUtau.Core {
             public BFloat16[]? bfloat16_data;
             public bool[]? bool_data;
         }
+        class RequestBody {
+            public string model_path = "";
+            public Dictionary<string, RemoteInput> inputs = new Dictionary<string, RemoteInput>();
+        }
 
         private bool _disposed = false;
         string url;
         string modelPath;
         public RemoteInferenceSession(string url, string modelPath, InferenceSession session) {
             this.url = url;
-            this.modelPath = modelPath;
+            this.modelPath = Uri.UnescapeDataString(new Uri(AppDomain.CurrentDomain.BaseDirectory).MakeRelativeUri(new Uri(modelPath)).ToString());
             this.session = session;
         }
 
         public override IReadOnlyCollection<NamedOnnxValue> Run(IReadOnlyCollection<NamedOnnxValue> inputs) {
             // Convert inputs to RemoteInput
-            Dictionary<string, RemoteInput> remoteInputs = new Dictionary<string, RemoteInput>();
+            RequestBody body = new RequestBody();
+            body.model_path = modelPath;
+            Dictionary<string, RemoteInput> remoteInputs = body.inputs;
 
             foreach (NamedOnnxValue input in inputs) {
                 Type typeT = input.Value.GetType().GetGenericArguments()[0];
@@ -182,8 +188,8 @@ namespace OpenUtau.Core {
             }
 
             // Send request
-            string reqStr = JsonConvert.SerializeObject(remoteInputs);
-            string apiUrl = url + "/inference/" + HttpUtility.UrlEncode(modelPath);
+            string reqStr = JsonConvert.SerializeObject(body);
+            string apiUrl = url + "/inference";
 
             using (var client = new System.Net.WebClient()) {
                 client.Headers.Add("Content-Type", "application/json");
