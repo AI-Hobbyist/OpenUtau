@@ -19,19 +19,24 @@ namespace OpenUtau.Core {
         }
     }
     public abstract class IOnnxInferenceSession : IDisposable {
-        public InferenceSession session;
         public abstract IReadOnlyCollection<NamedOnnxValue> Run(IReadOnlyCollection<NamedOnnxValue> inputs);
+        public abstract IReadOnlyList<string> GetInputNames();
         public abstract void Dispose();
     }
 
     class LocalInferenceSession : IOnnxInferenceSession {
         private bool _disposed = false;
+        InferenceSession session;
         public LocalInferenceSession(InferenceSession session) {
             this.session = session;
         }
 
         public override IReadOnlyCollection<NamedOnnxValue> Run(IReadOnlyCollection<NamedOnnxValue> inputs) {
             return session.Run(inputs);
+        }
+
+        public override IReadOnlyList<string> GetInputNames() {
+            return session.InputNames;
         }
 
         ~LocalInferenceSession() {
@@ -77,12 +82,10 @@ namespace OpenUtau.Core {
         private bool _disposed = false;
         string url;
         string modelPath;
-        public RemoteInferenceSession(string url, string modelPath, InferenceSession session) {
+        public RemoteInferenceSession(string url, string modelPath, SessionOptions options) {
             this.url = url;
             this.modelPath = Uri.UnescapeDataString(new Uri(AppDomain.CurrentDomain.BaseDirectory).MakeRelativeUri(new Uri(modelPath)).ToString());
-            this.session = session;
         }
-
         public override IReadOnlyCollection<NamedOnnxValue> Run(IReadOnlyCollection<NamedOnnxValue> inputs) {
             // Convert inputs to RemoteInput
             RequestBody body = new RequestBody();
@@ -188,13 +191,11 @@ namespace OpenUtau.Core {
             }
 
             // Send request
-            string reqStr = JsonConvert.SerializeObject(body);
-            string apiUrl = url + "/inference";
-
             using (var client = new System.Net.WebClient()) {
                 client.Headers.Add("Content-Type", "application/json");
                 client.Encoding = System.Text.Encoding.UTF8;
-                string resStr = client.UploadString(apiUrl, reqStr);
+                string reqStr = JsonConvert.SerializeObject(body);
+                string resStr = client.UploadString(url + "/inference", reqStr);
                 var resData = JsonConvert.DeserializeObject<Dictionary<string, RemoteInput>>(resStr);
                 var results = new List<NamedOnnxValue>(resData.Count);
                 for (int i = 0; i < resData.Count; i++) {
@@ -234,7 +235,30 @@ namespace OpenUtau.Core {
                 return results;
             }
         }
-
+        public override IReadOnlyList<string> GetInputNames() {
+            using (var client = new System.Net.WebClient()) {
+                client.Headers.Add("Content-Type", "application/json");
+                client.Encoding = System.Text.Encoding.UTF8;
+                string reqStr = HttpUtility.UrlEncode(modelPath);
+                string resStr = client.DownloadString(url + "/onnx_info/inputs?model_path=" + reqStr);
+                var resData = JsonConvert.DeserializeObject<List<string>>(resStr);
+                return resData;
+            }
+        }
+        public bool ModelExist() {
+            using (var client = new System.Net.WebClient()) {
+                client.Headers.Add("Content-Type", "application/json");
+                client.Encoding = System.Text.Encoding.UTF8;
+                try {
+                    string reqStr = HttpUtility.UrlEncode(modelPath);
+                    string resStr = client.DownloadString(url + "/exists?model_path=" + reqStr);
+                    return resStr == "true";
+                } catch (Exception ex) {
+                    Console.WriteLine(ex.Message);
+                    return false;
+                }
+            }
+        }
         ~RemoteInferenceSession() {
             Dispose(false);
         }
@@ -255,18 +279,20 @@ namespace OpenUtau.Core {
                 return new List<string> {
                 "cpu",
                 "directml",
-                "remote"
+                "remote (fallback cpu)",
+                "remote (fallback directml)"
                 };
             } else if (OS.IsMacOS()) {
                 return new List<string> {
                 "cpu",
                 "coreml",
-                "remote"
+                "remote (fallback cpu)",
+                "remote (fallback coreml)"
                 };
             }
             return new List<string> {
                 "cpu",
-                "remote"
+                "remote (fallback cpu)",
             };
         }
 
@@ -310,6 +336,12 @@ namespace OpenUtau.Core {
                 case "coreml":
                     options.AppendExecutionProvider_CoreML(CoreMLFlags.COREML_FLAG_ENABLE_ON_SUBGRAPH);
                     break;
+                case "remote (fallback directml)":
+                    options.AppendExecutionProvider_DML(Preferences.Default.OnnxGpu);
+                    break;
+                case "remote (fallback coreml)":
+                    options.AppendExecutionProvider_CoreML(CoreMLFlags.COREML_FLAG_ENABLE_ON_SUBGRAPH);
+                    break;
             }
             return new Tuple<string, SessionOptions>(runner, options);
         }
@@ -321,15 +353,17 @@ namespace OpenUtau.Core {
 
         public static IOnnxInferenceSession getInferenceSession(string modelPath) {
             var (runner, options) = getOnnxSessionOptions();
-            if (runner == "remote") {
-                return new RemoteInferenceSession(Preferences.Default.OnnxRemoteUrl, modelPath, new InferenceSession(modelPath, options));
-            } else {
-                return new LocalInferenceSession(new InferenceSession(modelPath, options));
+            if (runner.StartsWith("remote")) {
+                var session = new RemoteInferenceSession(Preferences.Default.OnnxRemoteUrl, modelPath, options);
+                if (session.ModelExist()) {
+                    return session;
+                }
             }
+            return new LocalInferenceSession(new InferenceSession(modelPath, options));
         }
 
-        public static void VerifyInputNames(InferenceSession session, IEnumerable<NamedOnnxValue> inputs) {
-            var sessionInputNames = session.InputNames.ToHashSet();
+        public static void VerifyInputNames(IOnnxInferenceSession session, IEnumerable<NamedOnnxValue> inputs) {
+            var sessionInputNames = session.GetInputNames().ToHashSet();
             var givenInputNames = inputs.Select(v => v.Name).ToHashSet();
             var missing = sessionInputNames
                 .Except(givenInputNames)

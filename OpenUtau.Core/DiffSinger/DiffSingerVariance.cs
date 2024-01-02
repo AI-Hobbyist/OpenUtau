@@ -116,7 +116,7 @@ namespace OpenUtau.Core.DiffSinger{
                     .Reshape(new int[] { 1, ph_dur.Length })));
             }
 
-            Onnx.VerifyInputNames(linguisticModel.session, linguisticInputs);
+            Onnx.VerifyInputNames(linguisticModel, linguisticInputs);
             var linguisticOutputs = linguisticModel.Run(linguisticInputs);
             Tensor<float> encoder_out = linguisticOutputs
                 .Where(o => o.Name == "encoder_out")
@@ -157,7 +157,7 @@ namespace OpenUtau.Core.DiffSinger{
                 var spkEmbedTensor = speakerEmbedManager.PhraseSpeakerEmbedByFrame(phrase, ph_dur, frameMs, totalFrames, headFrames, tailFrames);
                 varianceInputs.Add(NamedOnnxValue.CreateFromTensor("spk_embed", spkEmbedTensor));
             }
-            Onnx.VerifyInputNames(varianceModel.session, varianceInputs);
+            Onnx.VerifyInputNames(varianceModel, varianceInputs);
             var varianceOutputs = varianceModel.Run(varianceInputs);
             Tensor<float> energy_pred = varianceOutputs
                 .Where(o => o.Name == "energy_pred")

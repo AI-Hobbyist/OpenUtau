@@ -248,7 +248,7 @@ namespace OpenUtau.Core.DiffSinger {
             }
 
             var acousticModel = singer.getAcousticSession();
-            Onnx.VerifyInputNames(acousticModel.session, acousticInputs);
+            Onnx.VerifyInputNames(acousticModel, acousticInputs);
             Tensor<float> mel;
             var acousticOutputs = acousticModel.Run(acousticInputs);
             mel = acousticOutputs.First().AsTensor<float>().Clone();
