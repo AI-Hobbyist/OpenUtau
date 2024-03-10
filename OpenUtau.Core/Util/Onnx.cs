@@ -267,6 +267,19 @@ namespace OpenUtau.Core {
             GC.SuppressFinalize(this);
         }
         protected virtual void Dispose(bool disposing) {
+            using (var client = new System.Net.WebClient()) {
+                client.Headers.Add("Content-Type", "application/json");
+                client.Encoding = System.Text.Encoding.UTF8;
+                Dictionary<string, string> body = new Dictionary<string, string>() {
+                    { "model_path", modelPath }
+                };
+                try {
+                    string reqStr = JsonConvert.SerializeObject(body);
+                    string resStr = client.UploadString(url + "/release", reqStr);
+                } catch (Exception ex) {
+                    Console.WriteLine(ex.Message);
+                }
+            }
             if (!_disposed) {
                 _disposed = true;
             }
