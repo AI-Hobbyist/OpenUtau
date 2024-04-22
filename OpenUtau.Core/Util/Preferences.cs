@@ -143,8 +143,9 @@ namespace OpenUtau.Core.Util {
             public string OnnxRunner = string.Empty;
             public string OnnxRemoteUrl = "http://localhost:7889";
             public int OnnxGpu = 0;
-            public int DiffsingerSpeedup = 50;
-            public int DiffSingerDepth = 1000;
+            public double DiffSingerDepth = 1.0;
+            public int DiffSingerSteps = 20;
+            public bool DiffSingerTensorCache = true;
             public bool SkipRenderingMutedTracks = false;
             public string Language = string.Empty;
             public string? SortingOrder = null;
