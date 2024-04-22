@@ -41,9 +41,8 @@ namespace OpenUtau.Core.DiffSinger
             phonemes = File.ReadLines(phonemesPath, Encoding.UTF8).ToList();
             //Load models
             var linguisticModelPath = Path.Join(rootPath, dsConfig.linguistic);
-            var linguisticModelBytes = File.ReadAllBytes(linguisticModelPath);
-            linguisticHash = XXH64.DigestOf(linguisticModelBytes);
-            linguisticModel = Onnx.getInferenceSession(linguisticModelBytes);
+            linguisticHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(linguisticModelPath));
+            linguisticModel = Onnx.getInferenceSession(linguisticModelPath);
             var pitchModelPath = Path.Join(rootPath, dsConfig.pitch);
             pitchModel = Onnx.getInferenceSession(pitchModelPath);
             frameMs = 1000f * dsConfig.hop_size / dsConfig.sample_rate;
