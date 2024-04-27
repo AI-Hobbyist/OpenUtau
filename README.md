@@ -1,3 +1,35 @@
+**English** | [简体中文](README_zh.md)
+## Download
+If you have already installed OpenUtau, you don't need to install again. Just download [nsf_hifigan vocoder](https://github.com/xunmengshe/OpenUtau/releases/0.0.0.0), launch OpenUtau, and drag the vocoder file into OpenUtau window to import.
+
+For Windows users, please go to [Release Page](https://github.com/xunmengshe/OpenUtau/releases) and download the file with "diffsingerpack" which is shipped with vocoder.
+
+For MacOS and Linux users, please download from [here](https://github.com/stakira/OpenUtau/releases), then download [nsf_hifigan vocoder](https://github.com/xunmengshe/OpenUtau/releases/0.0.0.0). Launch OpenUtau, and drag the vocoder file into OpenUtau window to import.
+
+## About the state of this repo
+This repo was the development repo of OpenUtau's diffsinger renderer. Now the diffsinger renderer has been merged to [the official repo of OpenUtau](https://github.com/stakira/openutau). These two repos are basically the same thing now.
+
+This repo will continue to exist and provide diffsingerpack release for windows. Note that the official openutau and this repo provide the same functionalities. Both repos support diffsinger voicebanks and UTAU voicebanks. The only difference is that diffsingerpack ships with a vocoder so that you don't need to download it separately.
+
+## Usage
+[wiki/Usage](https://github.com/xunmengshe/OpenUtau/wiki/Usage)
+
+## Send Feedback
+If you run into any issue, feel free to provide your feedback:
+- [Provide Feedback on GitHub](https://github.com/xunmengshe/OpenUtau/issues/new?assignees=&labels=&template=bug-report.yml)
+- [Join DiffSinger Discord channel](https://discord.gg/JtKYyZgmGt)
+
+It's suggested to provide a full snapshot of your OpenUtau window, your ustx file and OpenUtau log file.
+
+## Links
+- [DiffSinger: Singing Voice Synthesis via Shallow Diffusion Mechanism](https://arxiv.org/abs/2105.02446)
+- [DiffSinger (maintained by OpenVPI)](https://github.com/openvpi/DiffSinger)
+- [DiffSinger Chinese Documentation](https://openvpi-docs.feishu.cn/wiki/space/7251035979191140356?ccm_open_type=lark_wiki_spaceLink)
+- [OpenUtau official repo](https://github.com/stakira/OpenUtau)
+
+---
+
+Below is the README inherited from the original repository.
 
 # OpenUtau
 
