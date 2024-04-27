@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using OpenUtau.Core.G2p;
 using OpenUtau.Core.Ustx;
 using WanaKanaNet;
 
@@ -21,6 +22,33 @@ namespace OpenUtau.Core.Editing {
         protected abstract string Transform(string lyric);
     }
 
+    public class ConnectSeparatedWord : BatchEdit {
+        public string Name => "pianoroll.menu.lyrics.connectseparatedword";
+
+        public void Run(UProject project, UVoicePart part, List<UNote> selectedNotes, DocManager docManager) {
+            var notes = selectedNotes.Count > 0 ? selectedNotes.ToArray() : part.notes.ToArray();
+            if (notes.Length == 0) {
+                return;
+            }
+            string[] lyrics = new string[notes.Length];
+            for (int i = 0; i < notes.Length; i++) {
+                if (notes[i].lyric.EndsWith("-") && i < notes.Length - 1) {
+                    lyrics[i] = notes[i].lyric.Replace("-", "") + notes[i + 1].lyric;
+                    lyrics[i + 1] = "+";
+                    i++;
+                } else if (notes[i].lyric.StartsWith("-") && i > 0) {
+                    lyrics[i - 1] = notes[i - 1].lyric + notes[i].lyric.Replace("-", "");
+                    lyrics[i] = "+";
+                } else {
+                    lyrics[i] = notes[i].lyric;
+                }
+            }
+            docManager.StartUndoGroup(true);
+            docManager.ExecuteCmd(new ChangeNoteLyricCommand(part, notes, lyrics));
+            docManager.EndUndoGroup();
+        }
+    }
+
     public class RomajiToHiragana : SingleNoteLyricEdit {
         static Dictionary<string, string> mapping = new Dictionary<string, string>() {
             {".", "."}, {",", ","}, {":", ":"}, {"/", "/"}, {"!", "!"}, {"?", "?"},
@@ -30,8 +58,8 @@ namespace OpenUtau.Core.Editing {
         private WanaKanaOptions option = new WanaKanaOptions() { CustomKanaMapping = mapping };
         public override string Name => "pianoroll.menu.lyrics.romajitohiragana";
         protected override string Transform(string lyric) {
-            string hiragana = WanaKana.ToHiragana(lyric, option).Replace('ゔ','ヴ');
-            if(Regex.IsMatch(hiragana, "[ぁ-んァ-ヴ]")) {
+            string hiragana = WanaKana.ToHiragana(lyric, option).Replace('ゔ', 'ヴ');
+            if (Regex.IsMatch(hiragana, "[ぁ-んァ-ヴ]")) {
                 return hiragana;
             } else {
                 return lyric;
@@ -43,6 +71,71 @@ namespace OpenUtau.Core.Editing {
         public override string Name => "pianoroll.menu.lyrics.hiraganatoromaji";
         protected override string Transform(string lyric) {
             return WanaKana.ToRomaji(lyric);
+        }
+    }
+
+    public class HanziToCantonese : SingleNoteLyricEdit {
+        public override string Name => "pianoroll.menu.lyrics.hanzitocan";
+        protected override string Transform(string lyric) {
+            if (lyric.Length == 1) {
+                return ZhG2p.CantoneseInstance.Convert(lyric, false, true);
+            } else {
+                return lyric;
+            }
+        }
+    }
+
+    public class LetterUpper : SingleNoteLyricEdit {
+        public override string Name => "pianoroll.menu.lyrics.letterupper";
+        protected override string Transform(string lyric) {
+            return lyric.ToUpper();
+        }
+    }
+
+    public class LetterLower : SingleNoteLyricEdit {
+        public override string Name => "pianoroll.menu.lyrics.letterlower";
+        protected override string Transform(string lyric) {
+            return lyric.ToLower();
+        }
+    }
+
+    public class AddLyricSuffix : SingleNoteLyricEdit {
+
+        private string suffix;
+        private string name;
+        public override string Name => name;
+
+        public AddLyricSuffix(string suffix, string name) {
+            this.suffix = suffix;
+            this.name = name;
+        }
+
+        protected override string Transform(string lyric) {
+            if (lyric.EndsWith(suffix)) {
+                return lyric;
+            } else {
+                return lyric + suffix;
+            }
+        }
+    }
+
+    public class RemoveLyricSuffix : SingleNoteLyricEdit {
+
+        private string suffix;
+        private string name;
+        public override string Name => name;
+
+        public RemoveLyricSuffix(string suffix, string name) {
+            this.suffix = suffix;
+            this.name = name;
+        }
+
+        protected override string Transform(string lyric) {
+            if (lyric.EndsWith(suffix)) {
+                return lyric.Replace(suffix, "");
+            } else {
+                return lyric;
+            }
         }
     }
 
@@ -112,7 +205,7 @@ namespace OpenUtau.Core.Editing {
                     string value = Regex.Replace(subbank.Suffix.Replace("_", ""), "[A-G](#|b)?[1-7]", "");
 
                     for (int i = 0; i < colors[clrIndex].Length && i < value.Length; i++) {
-                        if(colors[clrIndex][i] == value[i]) {
+                        if (colors[clrIndex][i] == value[i]) {
                             suffix += value[i];
                         } else {
                             break;
@@ -171,7 +264,7 @@ namespace OpenUtau.Core.Editing {
         }
     }
 
-    public class InsertSlur : BatchEdit{
+    public class InsertSlur : BatchEdit {
         public virtual string Name => name;
         private string name;
 
@@ -180,15 +273,15 @@ namespace OpenUtau.Core.Editing {
         }
 
         public void Run(UProject project, UVoicePart part, List<UNote> selectedNotes, DocManager docManager) {
-            if(selectedNotes.Count == 0){
+            if (selectedNotes.Count == 0) {
                 return;
             }
             var startPos = selectedNotes.First().position;
             Queue<string> lyricsQueue = new Queue<string>();
             docManager.StartUndoGroup(true);
-            foreach(var note in part.notes.Where(n => n.position >= startPos)){
+            foreach (var note in part.notes.Where(n => n.position >= startPos)) {
                 lyricsQueue.Enqueue(note.lyric);
-                if(selectedNotes.Contains(note)){
+                if (selectedNotes.Contains(note)) {
                     docManager.ExecuteCmd(new ChangeNoteLyricCommand(part, note, "+~"));
                 } else {
                     docManager.ExecuteCmd(new ChangeNoteLyricCommand(part, note, lyricsQueue.Dequeue()));

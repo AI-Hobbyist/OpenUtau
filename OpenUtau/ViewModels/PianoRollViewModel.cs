@@ -168,7 +168,7 @@ namespace OpenUtau.App.ViewModels {
 
             noteBatchEditCommand = ReactiveCommand.Create<BatchEdit>(edit => {
                 if (NotesViewModel.Part != null) {
-                    try{
+                    try {
                         edit.Run(NotesViewModel.Project, NotesViewModel.Part, NotesViewModel.Selection.ToList(), DocManager.Inst);
                     } catch (Exception e) {
                         var customEx = new MessageCustomizableException("Failed to run editing macro", "<translate:errors.failed.runeditingmacro>", e);
@@ -178,10 +178,14 @@ namespace OpenUtau.App.ViewModels {
             });
             NoteBatchEdits.AddRange(new List<BatchEdit>() {
                 new LoadRenderedPitch(),
-                new AddTailNote("-", "pianoroll.menu.notes.addtaildash"),
-                new AddTailNote("R", "pianoroll.menu.notes.addtailrest"),
+                new AddHeadNote("AP", "pianoroll.menu.notes.addheadap", 360),
+                new AddTailNote("-", "pianoroll.menu.notes.addtaildash", 120),
+                new AddTailNote("R", "pianoroll.menu.notes.addtailrest", 120),
+                new AddTailNote("SP", "pianoroll.menu.notes.addtailsp", 240),
+                new RemoveHeadNote("AP", "pianoroll.menu.notes.removeheadap"),
                 new RemoveTailNote("-", "pianoroll.menu.notes.removetaildash"),
                 new RemoveTailNote("R", "pianoroll.menu.notes.removetailrest"),
+                new RemoveTailNote("SP", "pianoroll.menu.notes.removetailsp"),
                 new Transpose(12, "pianoroll.menu.notes.octaveup"),
                 new Transpose(-12, "pianoroll.menu.notes.octavedown"),
                 new QuantizeNotes(15),
@@ -203,8 +207,16 @@ namespace OpenUtau.App.ViewModels {
             LyricBatchEdits.AddRange(new List<BatchEdit>() {
                 new RomajiToHiragana(),
                 new HiraganaToRomaji(),
+                new HanziToCantonese(),
+                new LetterLower(),
+                new LetterUpper(),
+                new ConnectSeparatedWord(),
                 new JapaneseVCVtoCV(),
                 new HanziToPinyin(),
+                new AddLyricSuffix("&3","pianoroll.menu.lyrics.addsuffixsan"),
+                new RemoveLyricSuffix("&3","pianoroll.menu.lyrics.removesuffixsan"),
+                new AddLyricSuffix("&j","pianoroll.menu.lyrics.addsuffixjpn"),
+                new RemoveLyricSuffix("&j","pianoroll.menu.lyrics.removesuffixjpn"),
                 new RemoveToneSuffix(),
                 new RemoveLetterSuffix(),
                 new MoveSuffixToVoiceColor(),
