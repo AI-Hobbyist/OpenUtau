@@ -58,7 +58,9 @@ namespace OpenUtau.App.ViewModels {
         public bool DegreeStyle0 { get => Preferences.Default.DegreeStyle == 0 ? true : false; }
         public bool DegreeStyle1 { get => Preferences.Default.DegreeStyle == 1 ? true : false; }
         public bool DegreeStyle2 { get => Preferences.Default.DegreeStyle == 2 ? true : false; }
-        public bool LockStartTime { get => Preferences.Default.LockStartTime == 1 ? true : false; }
+        public bool LockStartTime0 { get => Preferences.Default.LockStartTime == 0 ? true : false; }
+        public bool LockStartTime1 { get => Preferences.Default.LockStartTime == 1 ? true : false; }
+        public bool LockStartTime2 { get => Preferences.Default.LockStartTime == 2 ? true : false; }
         public bool PlaybackAutoScroll0 { get => Preferences.Default.PlaybackAutoScroll == 0 ? true : false; }
         public bool PlaybackAutoScroll1 { get => Preferences.Default.PlaybackAutoScroll == 1 ? true : false; }
         public bool PlaybackAutoScroll2 { get => Preferences.Default.PlaybackAutoScroll == 2 ? true : false; }
@@ -68,6 +70,8 @@ namespace OpenUtau.App.ViewModels {
         public ObservableCollectionExtended<MenuItemViewModel> NoteBatchEdits { get; private set; }
             = new ObservableCollectionExtended<MenuItemViewModel>();
         public ObservableCollectionExtended<MenuItemViewModel> LyricBatchEdits { get; private set; }
+            = new ObservableCollectionExtended<MenuItemViewModel>();
+        public ObservableCollectionExtended<MenuItemViewModel> ResetBatchEdits { get; private set; }
             = new ObservableCollectionExtended<MenuItemViewModel>();
         public ObservableCollectionExtended<MenuItemViewModel> NotesContextMenuItems { get; private set; }
             = new ObservableCollectionExtended<MenuItemViewModel>();
@@ -188,12 +192,6 @@ namespace OpenUtau.App.ViewModels {
                 new QuantizeNotes(30),
                 new AutoLegato(),
                 new FixOverlap(),
-                new ResetPitchBends(),
-                new ResetAllExpressions(),
-                new ClearVibratos(),
-                new ResetVibratos(),
-                new ClearTimings(),
-                new ResetAliases(),
                 new BakePitch(),
             }.Select(edit => new MenuItemViewModel() {
                 Header = ThemeManager.GetString(edit.Name),
@@ -211,6 +209,19 @@ namespace OpenUtau.App.ViewModels {
                 new RemovePhoneticHint(),
                 new DashToPlus(),
                 new InsertSlur(),
+            }.Select(edit => new MenuItemViewModel() {
+                Header = ThemeManager.GetString(edit.Name),
+                Command = noteBatchEditCommand,
+                CommandParameter = edit,
+            }));
+            ResetBatchEdits.AddRange(new List<BatchEdit>() {
+                new ResetAllParameters(),
+                new ResetPitchBends(),
+                new ResetAllExpressions(),
+                new ClearVibratos(),
+                new ResetVibratos(),
+                new ClearTimings(),
+                new ResetAliases(),
             }.Select(edit => new MenuItemViewModel() {
                 Header = ThemeManager.GetString(edit.Name),
                 Command = noteBatchEditCommand,

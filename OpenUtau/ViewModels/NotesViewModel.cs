@@ -53,6 +53,7 @@ namespace OpenUtau.App.ViewModels {
         [Reactive] public bool PenPlusTool { get; set; }
         [Reactive] public bool EraserTool { get; set; }
         [Reactive] public bool DrawPitchTool { get; set; }
+        [Reactive] public bool OverwritePitchTool { get; set; }
         [Reactive] public bool KnifeTool { get; set; }
         public ReactiveCommand<string, Unit> SelectToolCommand { get; }
         [Reactive] public bool ShowTips { get; set; }
@@ -203,18 +204,15 @@ namespace OpenUtau.App.ViewModels {
             }
             EraserTool = false;
             DrawPitchTool = false;
+            OverwritePitchTool = false;
             KnifeTool = false;
             SelectToolCommand = ReactiveCommand.Create<string>(index => {
                 CursorTool = index == "1";
-                if (Preferences.Default.PenPlusDefault) {
-                    PenPlusTool = index == "2";
-                    PenTool = index == "2+";
-                } else {
-                    PenTool = index == "2";
-                    PenPlusTool = index == "2+";
-                }
+                PenTool = index == "2";
+                PenPlusTool = index == "2+";
                 EraserTool = index == "3";
                 DrawPitchTool = index == "4";
+                OverwritePitchTool = index == "4+";
                 KnifeTool = index == "5";
             });
 
@@ -779,8 +777,13 @@ namespace OpenUtau.App.ViewModels {
             }
             var notes = Selection.ToList();
             notes.Sort((a, b) => a.position.CompareTo(b.position));
+            //Ignore slur lyrics
+            var mergedLyrics = String.Join("", notes.Select(x => x.lyric).Where(l => !l.StartsWith("+")));
+            if(mergedLyrics == ""){ //If all notes are slur, the merged note is single slur note
+                mergedLyrics = notes[0].lyric;
+            }
             DocManager.Inst.StartUndoGroup();
-            DocManager.Inst.ExecuteCmd(new ChangeNoteLyricCommand(Part, notes[0], String.Join("", notes.Select(x => x.lyric))));
+            DocManager.Inst.ExecuteCmd(new ChangeNoteLyricCommand(Part, notes[0], mergedLyrics));
             DocManager.Inst.ExecuteCmd(new ResizeNoteCommand(Part, notes[0], notes.Last().End - notes[0].End));
             notes.RemoveAt(0);
             DocManager.Inst.ExecuteCmd(new RemoveNoteCommand(Part, notes));
@@ -971,7 +974,7 @@ namespace OpenUtau.App.ViewModels {
             if (track.RendererSettings.Renderer == null) {
                 return true;
             }
-            if (Project.expressions.TryGetValue(expKey, out var descriptor)) {
+            if (track.TryGetExpDescriptor(Project, expKey, out var descriptor)) {
                 return track.RendererSettings.Renderer.SupportsExpression(descriptor);
             }
             if (expKey == track.VoiceColorExp.abbr) {
@@ -997,7 +1000,9 @@ namespace OpenUtau.App.ViewModels {
                     PrimaryKeyNotSupported = !IsExpSupported(PrimaryKey);
                 } else if (cmd is SetPlayPosTickNotification setPlayPosTick) {
                     SetPlayPos(setPlayPosTick.playPosTick, setPlayPosTick.waitingRendering);
-                    MaybeAutoScroll(PlayPosX);
+                    if (!setPlayPosTick.pause || Preferences.Default.LockStartTime == 1) {
+                        MaybeAutoScroll(PlayPosX);
+                    }
                 } else if (cmd is FocusNoteNotification focusNote) {
                     if (focusNote.part == Part) {
                         FocusNote(focusNote.note);
