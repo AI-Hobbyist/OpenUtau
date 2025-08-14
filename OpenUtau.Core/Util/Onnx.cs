@@ -367,7 +367,7 @@ namespace OpenUtau.Core {
 
         public static IOnnxInferenceSession getInferenceSession(string modelPath) {
             var (runner, options) = getOnnxSessionOptions();
-            if (runner.StartsWith("remote")) {
+            if (runner.StartsWith("Remote")) {
                 var session = new RemoteInferenceSession(Preferences.Default.OnnxRemoteUrl, modelPath, options);
                 if (session.ModelExist()) {
                     return session;
