@@ -11,6 +11,9 @@ namespace OpenUtau.Core.Ustx {
     public class UNote : IComparable {
         static readonly Regex phoneticHintPattern = new Regex(@"\[(.*)\]");
 
+        /// <summary>
+        /// Position of the note in ticks, relative to the beginning of the part.
+        /// </summary>
         public int position;
         public int duration;
         public int tone;
@@ -22,6 +25,10 @@ namespace OpenUtau.Core.Ustx {
         public List<UPhonemeOverride> phonemeOverrides = new List<UPhonemeOverride>();
 
         [YamlIgnore] public int End => position + duration;
+
+        /// <summary>
+        /// Position of the note in milliseconds, relative to the beginning of the project.
+        /// </summary>
         [YamlIgnore] public double PositionMs { get; set; }
         [YamlIgnore] public double DurationMs => EndMs - PositionMs;
         [YamlIgnore] public double EndMs { get; set; }
@@ -213,6 +220,8 @@ namespace OpenUtau.Core.Ustx {
                 return;
             }
 
+            phonemeExpressions.RemoveAll(exp => exp.descriptor?.abbr == abbr);
+
             int indexes = phonemeIndexes.LastOrDefault() + 1;
             for (int i = 0; i < indexes; i++) {
                 if (i == 0 || phonemeIndexes.Contains(i)) {
@@ -222,21 +231,14 @@ namespace OpenUtau.Core.Ustx {
                     } else {
                         value = values.Last();
                     }
-
                     if (value == null) {
-                        phonemeExpressions.RemoveAll(exp => exp.descriptor?.abbr == abbr && exp.index == i);
                         continue;
                     }
-                    var phonemeExp = phonemeExpressions.FirstOrDefault(exp => exp.descriptor?.abbr == abbr && exp.index == i);
-                    if (phonemeExp != null) {
-                        phonemeExp.descriptor = trackExp.descriptor;
-                        phonemeExp.value = (float)value;
-                    } else {
-                        phonemeExpressions.Add(new UExpression(trackExp.descriptor) {
-                            index = i,
-                            value = (float)value,
-                        });
-                    }
+
+                    phonemeExpressions.Add(new UExpression(trackExp.descriptor) {
+                        index = i,
+                        value = (float)value,
+                    });
                 }
             }
         }
@@ -435,7 +437,14 @@ namespace OpenUtau.Core.Ustx {
     };
 
     public class PitchPoint : IComparable<PitchPoint> {
+        /// <summary>
+        /// Position relative to the beginning of the note in milliseconds.
+        /// </summary>
         public float X;
+
+        /// <summary>
+        /// Pitch relative to the tone of the note in 0.1 semi-tones.
+        /// </summary>
         public float Y;
         public PitchPointShape shape;
 

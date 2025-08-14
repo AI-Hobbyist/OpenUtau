@@ -68,7 +68,7 @@ namespace OpenUtau.Core.Render {
         public readonly bool direct;
         public readonly Vector2[] envelope;
 
-        // voicevox args
+        // voicevox & enunu args
         public readonly int toneShift;
 
         public readonly UOto oto;
@@ -189,6 +189,8 @@ namespace OpenUtau.Core.Render {
 
         internal readonly IRenderer renderer;
         public readonly string wavtool;
+
+        private List<string> cacheFiles = new List<string>();
 
         internal RenderPhrase(UProject project, UTrack track, UVoicePart part, IEnumerable<UPhoneme> phonemes) {
             var uNotes = new List<UNote> { phonemes.First().Parent };
@@ -507,6 +509,35 @@ namespace OpenUtau.Core.Render {
                 phrasePhonemes.Clear();
             }
             return phrases;
+        }
+
+        public void AddCacheFile(string file) {
+            if (string.IsNullOrWhiteSpace(file)) return;
+            var filename = Path.GetFileNameWithoutExtension(file);
+            if (!cacheFiles.Contains(filename)) {
+                cacheFiles.Add(filename);
+            }
+        }
+
+        public void DeleteCacheFiles() {
+            foreach (var filename in cacheFiles) {
+                var files = Directory.EnumerateFiles(PathManager.Inst.CachePath, $"{filename}*");
+                foreach (var file in files) {
+                    try {
+                        File.Delete(file);
+                    } catch (Exception e) {
+                        Log.Error(e, $"Failed to delete file {file}");
+                    }
+                }
+            }
+            cacheFiles.Clear();
+
+            if (singer is ClassicSinger cSinger && cSinger.Frqs != null) {
+                foreach (var oto in phones.Select(p => p.oto).Distinct()) {
+                    oto.Frq = null;
+                    cSinger.Frqs.Remove(oto.File);
+                }
+            }
         }
     }
 }

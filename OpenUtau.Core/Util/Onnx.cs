@@ -290,22 +290,21 @@ namespace OpenUtau.Core {
         public static List<string> getRunnerOptions() {
             if (OS.IsWindows()) {
                 return new List<string> {
-                "cpu",
-                "directml",
-                "remote (fallback cpu)",
-                "remote (fallback directml)"
+                "CPU",
+                "DirectML"
+                "Remote (Fallback CPU)",
+                "Remote (Fallback DirectML)"
                 };
             } else if (OS.IsMacOS()) {
                 return new List<string> {
-                "cpu",
-                "coreml",
-                "remote (fallback cpu)",
-                "remote (fallback coreml)"
+                "CPU",
+                "CoreML"
+        ·       "Remote (Fallback CPU)",
+                "Remote (Fallback CoreML)"
                 };
             }
             return new List<string> {
-                "cpu",
-                "remote (fallback cpu)",
+                "CPU"
             };
         }
 
@@ -340,19 +339,19 @@ namespace OpenUtau.Core {
                 runner = runnerOptions[0];
             }
             if (!runnerOptions.Contains(runner)) {
-                runner = "cpu";
+                runner = "CPU";
             }
             switch(runner){
-                case "directml":
+                case "DirectML":
                     options.AppendExecutionProvider_DML(Preferences.Default.OnnxGpu);
                     break;
-                case "coreml":
+                case "CoreML":
                     options.AppendExecutionProvider_CoreML(CoreMLFlags.COREML_FLAG_ENABLE_ON_SUBGRAPH);
                     break;
-                case "remote (fallback directml)":
+                case "Remote (Fallback DirectML)":
                     options.AppendExecutionProvider_DML(Preferences.Default.OnnxGpu);
                     break;
-                case "remote (fallback coreml)":
+                case "Remote (Fallback CoreML))":
                     options.AppendExecutionProvider_CoreML(CoreMLFlags.COREML_FLAG_ENABLE_ON_SUBGRAPH);
                     break;
             }

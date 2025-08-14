@@ -18,6 +18,7 @@ namespace OpenUtau.Core.DiffSinger
     {
         USinger singer;
         DsConfig dsConfig;
+        Dictionary<string, int>languageIds = new Dictionary<string, int>();
         string rootPath;
         float frameMs;
         ulong linguisticHash;
@@ -25,20 +26,33 @@ namespace OpenUtau.Core.DiffSinger
         IOnnxInferenceSession linguisticModel;
         IOnnxInferenceSession durationModel;
         IG2p g2p;
-        List<string> phonemes;
+        Dictionary<string, int> phonemeTokens;
         DiffSingerSpeakerEmbedManager speakerEmbedManager;
 
         string defaultPause = "SP";
         protected virtual string GetDictionaryName()=>"dsdict.yaml";
+        public virtual string GetLangCode()=>String.Empty;//The language code of the language the phonemizer is made for
+
+        private bool _singerLoaded;
 
         public override void SetSinger(USinger singer) {
+            if (_singerLoaded && singer == this.singer) return;
+            try {
+                _singerLoaded = _executeSetSinger(singer);
+            } catch {
+                _singerLoaded = false;
+                throw;
+            }
+        }
+
+        private bool _executeSetSinger(USinger singer) {
             this.singer = singer;
-            if(singer==null){
-                return;
+            if (singer == null) {
+                return false;
             }
             if(singer.Location == null){
                 Log.Error("Singer location is null");
-                return;
+                return false;
             }
             if (File.Exists(Path.Join(singer.Location, "dsdur", "dsconfig.yaml"))) {
                 rootPath = Path.Combine(singer.Location, "dsdur");
@@ -52,14 +66,28 @@ namespace OpenUtau.Core.DiffSinger
                 dsConfig = Yaml.DefaultDeserializer.Deserialize<DsConfig>(configTxt);
             } catch(Exception e) {
                 Log.Error(e, $"failed to load dsconfig from {configPath}");
-                return;
+                return false;
+            }
+            //Load language id if needed
+            if (dsConfig.use_lang_id) {
+                if (dsConfig.languages == null) {
+                    Log.Error("\"languages\" field is not specified in dsconfig.yaml");
+                    return false;
+                }
+                var langIdPath = Path.Join(rootPath, dsConfig.languages);
+                try {
+                    languageIds = DiffSingerUtils.LoadLanguageIds(langIdPath);
+                } catch (Exception e) {
+                    Log.Error(e, $"failed to load language id from {langIdPath}");
+                    return false;
+                }
             }
             this.frameMs = dsConfig.frameMs();
             //Load g2p
-            g2p = LoadG2p(rootPath);
+            g2p = LoadG2p(rootPath, dsConfig.use_lang_id);
             //Load phonemes list
             string phonemesPath = Path.Combine(rootPath, dsConfig.phonemes);
-            phonemes = File.ReadLines(phonemesPath,singer.TextFileEncoding).ToList();
+            phonemeTokens = DiffSingerUtils.LoadPhonemes(phonemesPath);
             //Load models
             var linguisticModelPath = Path.Join(rootPath, dsConfig.linguistic);
             try {
@@ -67,7 +95,7 @@ namespace OpenUtau.Core.DiffSinger
                 linguisticModel = Onnx.getInferenceSession(linguisticModelPath);
             } catch (Exception e) {
                 Log.Error(e, $"failed to load linguistic model from {linguisticModelPath}");
-                return;
+                return false;
             }
             var durationModelPath = Path.Join(rootPath, dsConfig.dur);
             try {
@@ -75,11 +103,12 @@ namespace OpenUtau.Core.DiffSinger
                 durationModel = Onnx.getInferenceSession(durationModelPath);
             } catch (Exception e) {
                 Log.Error(e, $"failed to load duration model from {durationModelPath}");
-                return;
+                return false;
             }
+            return true;
         }
 
-        protected virtual IG2p LoadG2p(string rootPath) {
+        protected virtual IG2p LoadG2p(string rootPath, bool useLangId = false) {
             //Each phonemizer has a delicated dictionary name, such as dsdict-en.yaml, dsdict-ru.yaml.
             //If this dictionary exists, load it.
             //If not, load dsdict.yaml.
@@ -105,6 +134,29 @@ namespace OpenUtau.Core.DiffSinger
             return new G2pFallbacks(g2ps.ToArray());
         }
 
+        //Check if the phoneme is supported. If unsupported, return an empty string.
+        //And apply language prefix to phoneme
+        string ValidatePhoneme(string phoneme){
+            if(g2p.IsValidSymbol(phoneme) && phonemeTokens.ContainsKey(phoneme)){
+                return phoneme;
+            }
+            var langCode = GetLangCode();
+            if(langCode != String.Empty){
+                var phonemeWithLanguage = langCode + "/" + phoneme;
+                if(g2p.IsValidSymbol(phonemeWithLanguage)  && phonemeTokens.ContainsKey(phonemeWithLanguage)){
+                    return phonemeWithLanguage;
+                }
+            }
+            return String.Empty;
+        }
+
+        string[] ParsePhoneticHint(string phoneticHint) {
+            return phoneticHint.Split()
+                .Select(ValidatePhoneme)
+                .Where(s => !String.IsNullOrEmpty(s)) // skip invalid symbols.
+                .ToArray();
+        }
+
         string[] GetSymbols(Note note) {
             //priority:
             //1. phonetic hint
@@ -113,9 +165,7 @@ namespace OpenUtau.Core.DiffSinger
             //4. empty
             if (!string.IsNullOrEmpty(note.phoneticHint)) {
                 // Split space-separated symbols into an array.
-                return note.phoneticHint.Split()
-                    .Where(s => g2p.IsValidSymbol(s)) // skip the invalid symbols.
-                    .ToArray();
+                return ParsePhoneticHint(note.phoneticHint);
             }
             // User has not provided hint, query g2p dictionary.
             var g2presult = g2p.Query(note.lyric)
@@ -123,10 +173,8 @@ namespace OpenUtau.Core.DiffSinger
             if(g2presult != null) {
                 return g2presult;
             }
-            //not founded in g2p dictionary, treat lyric as phonetic hint
-            var lyricSplited = note.lyric.Split()
-                    .Where(s => g2p.IsValidSymbol(s)) // skip the invalid symbols.
-                    .ToArray();
+            //not found in g2p dictionary, treat lyric as phonetic hint
+            var lyricSplited = ParsePhoneticHint(note.lyric);
             if (lyricSplited.Length > 0) {
                 return lyricSplited;
             }
@@ -152,12 +200,19 @@ namespace OpenUtau.Core.DiffSinger
         /// distribute phonemes to each note inside the group
         /// </summary>
         List<phonemesPerNote> ProcessWord(Note[] notes, string[] symbols){
+            //Check if all phonemes are defined in dsdict.yaml (for their types)
+            foreach (var symbol in symbols) {
+                if (!g2p.IsValidSymbol(symbol)) {
+                    throw new InvalidDataException(
+                        $"Type definition of symbol \"{symbol}\" not found. Consider adding it to dsdict.yaml (or dsdict-<lang>.yaml) of the phonemizer.");
+                }
+            }
             var wordPhonemes = new List<phonemesPerNote>{
                 new phonemesPerNote(-1, notes[0].tone)
             };
             var dsPhonemes = symbols
                 .Select((symbol, index) => new dsPhoneme(symbol, GetSpeakerAtIndex(notes[0], index)))
-                .ToArray(); 
+                .ToArray();
             var isVowel = dsPhonemes.Select(s => g2p.IsVowel(s.Symbol)).ToArray();
             var isGlide = dsPhonemes.Select(s => g2p.IsGlide(s.Symbol)).ToArray();
             var nonExtensionNotes = notes.Where(n=>!IsSyllableVowelExtensionNote(n)).ToArray();
@@ -167,6 +222,7 @@ namespace OpenUtau.Core.DiffSinger
             }
             for(int i=0; i<dsPhonemes.Length; i++){
                 if(isVowel[i]){
+                    //In "Consonant-Glide-Vowel" syllable, the glide phoneme is the first phoneme in the note's timespan.
                     if(i>=2 && isGlide[i-1] && !isVowel[i-2]){
                         isStart[i-1] = true;
                     }else{
@@ -227,11 +283,11 @@ namespace OpenUtau.Core.DiffSinger
         }
 
         int PhonemeTokenize(string phoneme){
-            int result = phonemes.IndexOf(phoneme);
-            if(result < 0){
+            bool success = phonemeTokens.TryGetValue(phoneme, out int token);
+            if(!success){
                 throw new Exception($"Phoneme \"{phoneme}\" isn't supported by timing model. Please check {Path.Combine(rootPath, dsConfig.phonemes)}");
             }
-            return result;
+            return token;
         }
         
         protected override void ProcessPart(Note[][] phrase) {
@@ -249,7 +305,7 @@ namespace OpenUtau.Core.DiffSinger
             var wordFound = new bool[phrase.Length];
             foreach (int wordIndex in Enumerable.Range(0, phrase.Length)) {
                 Note[] word = phrase[wordIndex];
-                var symbols = GetSymbols(word[0]);
+                var symbols = GetSymbols(word[0]).Where(s => phonemeTokens.ContainsKey(s)).ToArray();
                 if (symbols == null || symbols.Length == 0) {
                     symbols = new string[] { defaultPause };
                     wordFound[wordIndex] = false;
@@ -289,6 +345,16 @@ namespace OpenUtau.Core.DiffSinger
             linguisticInputs.Add(NamedOnnxValue.CreateFromTensor("word_dur",
                 new DenseTensor<Int64>(word_dur, new int[] { word_dur.Length }, false)
                 .Reshape(new int[] { 1, word_dur.Length })));
+            //Language id
+            if(dsConfig.use_lang_id){
+                var langIdByPhone = phrasePhonemes
+                    .SelectMany(n => n.Phonemes)
+                    .Select(p => (long)languageIds.GetValueOrDefault(p.Language(), 0))
+                    .ToArray();
+                var langIdTensor = new DenseTensor<Int64>(langIdByPhone, new int[] { langIdByPhone.Length }, false)
+                    .Reshape(new int[] { 1, langIdByPhone.Length });
+                linguisticInputs.Add(NamedOnnxValue.CreateFromTensor("languages", langIdTensor));
+            }
             Onnx.VerifyInputNames(linguisticModel, linguisticInputs);
             var linguisticCache = Preferences.Default.DiffSingerTensorCache
                 ? new DiffSingerCache(linguisticHash, linguisticInputs)
@@ -391,6 +457,10 @@ namespace OpenUtau.Core.DiffSinger
         public dsPhoneme(string symbol, string speaker){
             Symbol = symbol;
             Speaker = speaker;
+        }
+
+        public string Language(){
+            return DiffSingerUtils.PhonemeLanguage(Symbol);
         }
     }
 

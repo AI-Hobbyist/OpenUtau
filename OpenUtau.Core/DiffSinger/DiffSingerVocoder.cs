@@ -20,6 +20,7 @@ namespace OpenUtau.Core.DiffSinger {
         public double mel_fmax => config.mel_fmax;
         public string mel_base => config.mel_base;
         public string mel_scale => config.mel_scale;
+        public bool pitch_controllable => config.pitch_controllable;
 
         //Get vocoder by package name
         public DsVocoder(string name) {
@@ -32,7 +33,12 @@ namespace OpenUtau.Core.DiffSinger {
                 //model = File.ReadAllBytes(Path.Combine(Location, config.model));
             }
             catch (Exception ex) {
-                throw new MessageCustomizableException($"Error loading vocoder {name}", $"<translate:errors.diffsinger.downloadvocoder1>{name}<translate:errors.diffsinger.downloadvocoder2>https://github.com/xunmengshe/OpenUtau/wiki/Vocoders", new Exception($"Error loading vocoder {name}"));
+                throw new MessageCustomizableException(
+                    $"Error loading vocoder \"{name}\"",
+                    $"<translate:errors.diffsinger.downloadvocoder>",
+                    new Exception($"Error loading vocoder \"{name}\""),
+                    true,
+                    new string[] { name, "https://github.com/xunmengshe/OpenUtau/wiki/Vocoders" });
             }
             hash = XXH64.DigestOf(Encoding.UTF8.GetBytes(Path.Combine(Location, config.model)));
             session = Onnx.getInferenceSession(Path.Combine(Location, config.model));
@@ -73,5 +79,6 @@ namespace OpenUtau.Core.DiffSinger {
         public double mel_fmax = 16000;
         public string mel_base = "10";  // or "e"
         public string mel_scale = "slaney";  // or "htk"
+        public bool pitch_controllable = false;
     }
 }

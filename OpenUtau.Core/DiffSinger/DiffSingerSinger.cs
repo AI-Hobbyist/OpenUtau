@@ -41,8 +41,9 @@ namespace OpenUtau.Core.DiffSinger {
         List<USubbank> subbanks = new List<USubbank>();
         List<UOto> otos = new List<UOto>();
         Dictionary<string, UOto> otoMap = new Dictionary<string, UOto>();
-
         public List<string> phonemes = new List<string>();
+        Dictionary<string, int> phonemeTokens;
+        public Dictionary<string, int> languageIds = new Dictionary<string, int>();
         public DsConfig dsConfig;
         public ulong acousticHash;
         public IOnnxInferenceSession acousticSession = null;
@@ -50,6 +51,8 @@ namespace OpenUtau.Core.DiffSinger {
         public DsPitch pitchPredictor = null;
         public DiffSingerSpeakerEmbedManager speakerEmbedManager = null;
         public DsVariance variancePredictor = null;
+        public bool HasPitchPredictor => File.Exists(Path.Join(Location, "dspitch", "dsconfig.yaml"));
+        public bool HasVariancePredictor => File.Exists(Path.Join(Location,"dsvariance", "dsconfig.yaml"));
 
         public DiffSingerSinger(Voicebank voicebank) {
             this.voicebank = voicebank;
@@ -94,12 +97,27 @@ namespace OpenUtau.Core.DiffSinger {
             string phonemesPath = Path.Combine(Location, dsConfig.phonemes);
             if(phonemesPath != null && File.Exists(phonemesPath)){
                 try {
-                    phonemes = File.ReadLines(phonemesPath, TextFileEncoding).ToList();
+                    phonemeTokens = DiffSingerUtils.LoadPhonemes(phonemesPath);
+                    phonemes = phonemeTokens.Keys.ToList();
                 } catch (Exception e){
                     Log.Error(e, $"Failed to load phoneme list for {Name} from {phonemesPath}");
                 }
             } else {
                 Log.Error($"phonemes file not found for {Name} at {phonemesPath}");
+            }
+
+            //Load language Id if needed
+            if(dsConfig.use_lang_id){
+                if(dsConfig.languages == null){
+                    Log.Error("\"languages\" field is not specified in dsconfig.yaml");
+                } else {
+                var langIdPath = Path.Join(Location, dsConfig.languages);
+                    try {
+                        languageIds = DiffSingerUtils.LoadLanguageIds(langIdPath);
+                    } catch (Exception e) {
+                        Log.Error(e, $"failed to load language id from {langIdPath}");
+                    }
+                }
             }
 
             var dummyOtoSet = new UOtoSet(new OtoSet(), Location);
@@ -163,13 +181,11 @@ namespace OpenUtau.Core.DiffSinger {
             return vocoder;
         }
 
-        public DsPitch getPitchPredictor(){
+        public DsPitch? getPitchPredictor(){
             if(pitchPredictor is null) {
-                if(File.Exists(Path.Join(Location, "dspitch", "dsconfig.yaml"))){
+                if(HasPitchPredictor){
                     pitchPredictor = new DsPitch(Path.Join(Location, "dspitch"));
-                    return pitchPredictor;
                 }
-                pitchPredictor = new DsPitch(Location);
             }
             return pitchPredictor;
         }
@@ -181,23 +197,21 @@ namespace OpenUtau.Core.DiffSinger {
             return speakerEmbedManager;
         }
 
-        public DsVariance getVariancePredictor(){
+        public DsVariance? getVariancePredictor(){
             if(variancePredictor is null) {
-                if(File.Exists(Path.Join(Location,"dsvariance", "dsconfig.yaml"))){
+                if(HasVariancePredictor){
                     variancePredictor = new DsVariance(Path.Join(Location, "dsvariance"));
-                    return variancePredictor;
                 }
-                variancePredictor = new DsVariance(Location);
             }
             return variancePredictor;
         }
 
         public int PhonemeTokenize(string phoneme){
-            int result = phonemes.IndexOf(phoneme);
-            if(result < 0){
+            bool success = phonemeTokens.TryGetValue(phoneme, out int token);
+            if(!success){
                 throw new Exception($"Phoneme \"{phoneme}\" isn't supported by acoustic model. Please check {Path.Combine(Location, dsConfig.phonemes)}");
             }
-            return result;
+            return token;
         }
 
         public override void FreeMemory(){

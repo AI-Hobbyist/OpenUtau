@@ -8,7 +8,6 @@ using DynamicData.Binding;
 using OpenUtau.App.Views;
 using OpenUtau.Classic;
 using OpenUtau.Core;
-using OpenUtau.Core.Editing;
 using OpenUtau.Core.Ustx;
 using OpenUtau.Core.Util;
 using ReactiveUI;
@@ -44,7 +43,6 @@ namespace OpenUtau.App.ViewModels {
 
     public class PianoRollViewModel : ViewModelBase, ICmdSubscriber {
 
-        public bool ExtendToFrame => OS.IsMacOS();
         [Reactive] public NotesViewModel NotesViewModel { get; set; }
         [Reactive] public PlaybackViewModel? PlaybackViewModel { get; set; }
 
@@ -81,6 +79,7 @@ namespace OpenUtau.App.ViewModels {
         [Reactive] public double Progress { get; set; }
         public ReactiveCommand<NoteHitInfo, Unit> NoteDeleteCommand { get; set; }
         public ReactiveCommand<NoteHitInfo, Unit> NoteCopyCommand { get; set; }
+        public ReactiveCommand<NoteHitInfo, Unit> ClearPhraseCacheCommand { get; set; }
         public ReactiveCommand<PitchPointHitInfo, Unit> PitEaseInOutCommand { get; set; }
         public ReactiveCommand<PitchPointHitInfo, Unit> PitLinearCommand { get; set; }
         public ReactiveCommand<PitchPointHitInfo, Unit> PitEaseInCommand { get; set; }
@@ -90,7 +89,6 @@ namespace OpenUtau.App.ViewModels {
         public ReactiveCommand<PitchPointHitInfo, Unit> PitAddCommand { get; set; }
 
         private ReactiveCommand<Classic.Plugin, Unit> legacyPluginCommand;
-        private ReactiveCommand<BatchEdit, Unit> noteBatchEditCommand;
 
         public PianoRollViewModel() {
             NotesViewModel = new NotesViewModel();
@@ -100,6 +98,9 @@ namespace OpenUtau.App.ViewModels {
             });
             NoteCopyCommand = ReactiveCommand.Create<NoteHitInfo>(info => {
                 NotesViewModel.CopyNotes();
+            });
+            ClearPhraseCacheCommand = ReactiveCommand.Create<NoteHitInfo>(info => {
+                NotesViewModel.ClearPhraseCache();
             });
             PitEaseInOutCommand = ReactiveCommand.Create<PitchPointHitInfo>(info => {
                 if (NotesViewModel.Part == null) { return; }
@@ -169,65 +170,6 @@ namespace OpenUtau.App.ViewModels {
                 }
             });
             LoadLegacyPlugins();
-
-            noteBatchEditCommand = ReactiveCommand.Create<BatchEdit>(edit => {
-                if (NotesViewModel.Part != null) {
-                    try{
-                        edit.Run(NotesViewModel.Project, NotesViewModel.Part, NotesViewModel.Selection.ToList(), DocManager.Inst);
-                    } catch (Exception e) {
-                        var customEx = new MessageCustomizableException("Failed to run editing macro", "<translate:errors.failed.runeditingmacro>", e);
-                        DocManager.Inst.ExecuteCmd(new ErrorMessageNotification(customEx));
-                    }
-                }
-            });
-            NoteBatchEdits.AddRange(new List<BatchEdit>() {
-                new LoadRenderedPitch(),
-                new AddTailNote("-", "pianoroll.menu.notes.addtaildash"),
-                new AddTailNote("R", "pianoroll.menu.notes.addtailrest"),
-                new RemoveTailNote("-", "pianoroll.menu.notes.removetaildash"),
-                new RemoveTailNote("R", "pianoroll.menu.notes.removetailrest"),
-                new Transpose(12, "pianoroll.menu.notes.octaveup"),
-                new Transpose(-12, "pianoroll.menu.notes.octavedown"),
-                new QuantizeNotes(15),
-                new QuantizeNotes(30),
-                new AutoLegato(),
-                new FixOverlap(),
-                new BakePitch(),
-            }.Select(edit => new MenuItemViewModel() {
-                Header = ThemeManager.GetString(edit.Name),
-                Command = noteBatchEditCommand,
-                CommandParameter = edit,
-            }));
-            LyricBatchEdits.AddRange(new List<BatchEdit>() {
-                new RomajiToHiragana(),
-                new HiraganaToRomaji(),
-                new JapaneseVCVtoCV(),
-                new HanziToPinyin(),
-                new RemoveToneSuffix(),
-                new RemoveLetterSuffix(),
-                new MoveSuffixToVoiceColor(),
-                new RemovePhoneticHint(),
-                new DashToPlus(),
-                new InsertSlur(),
-            }.Select(edit => new MenuItemViewModel() {
-                Header = ThemeManager.GetString(edit.Name),
-                Command = noteBatchEditCommand,
-                CommandParameter = edit,
-            }));
-            ResetBatchEdits.AddRange(new List<BatchEdit>() {
-                new ResetAllParameters(),
-                new ResetPitchBends(),
-                new ResetAllExpressions(),
-                new ClearVibratos(),
-                new ResetVibratos(),
-                new ClearTimings(),
-                new ResetAliases(),
-            }.Select(edit => new MenuItemViewModel() {
-                Header = ThemeManager.GetString(edit.Name),
-                Command = noteBatchEditCommand,
-                CommandParameter = edit,
-            }));
-            DocManager.Inst.AddSubscriber(this);
         }
 
         private void LoadLegacyPlugins() {

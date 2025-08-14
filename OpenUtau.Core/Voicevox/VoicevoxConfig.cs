@@ -25,8 +25,6 @@ namespace OpenUtau.Core.Voicevox {
         public string version = string.Empty;
         public string policy = string.Empty;
         public string portraitPath = string.Empty;
-        //So that the renderer can distinguish between phonemizers.
-        public string Tag = "DEFAULT";
 
         public List<Style_infos> style_infos;
         //Prepare for future additions of Teacher Singer.
@@ -39,19 +37,25 @@ namespace OpenUtau.Core.Voicevox {
                 var response = VoicevoxClient.Inst.SendRequest(new VoicevoxURL() { method = "GET", path = "/engine_manifest" });
                 var jObj = JObject.Parse(response.Item1);
                 if (jObj.ContainsKey("detail")) {
-                    Log.Error($"Response was incorrect. : {jObj}");
+                    var errorMessage = $"Response was incorrect. : {jObj}";
+                    Log.Error(errorMessage);
+                    throw new VoicevoxException(errorMessage);
                 }
                 var manifest = jObj.ToObject<Engine_manifest>();
                 manifest.SaveLicenses(singer.Location);
-            } catch(Exception e) {
-                Log.Error($"Could not load Licenses.:{e}");
+            } catch (Exception e) {
+                var errorMessage = $"Could not load Licenses.:{e}";
+                Log.Error(errorMessage);
+                throw new VoicevoxException(errorMessage, e);
             }
             try {
 
                 var response = VoicevoxClient.Inst.SendRequest(new VoicevoxURL() { method = "GET", path = "/singers" });
                 var jObj = JObject.Parse(response.Item1);
                 if (jObj.ContainsKey("detail")) {
-                    Log.Error($"Response was incorrect. : {jObj}");
+                    var errorMessage = $"Response was incorrect. : {jObj}";
+                    Log.Error(errorMessage);
+                    throw new VoicevoxException(errorMessage);
                 }
                 var configs = jObj["json"].ToObject<List<RawVoicevoxConfig>>();
                 var parentDirectory = Directory.GetParent(singer.Location).ToString();
@@ -80,9 +84,12 @@ namespace OpenUtau.Core.Voicevox {
                     vvList.Add(voicevoxConfig);
                 }
                 return vvList.Where(vv => vv.name.Equals(singer.Name)).ToList()[0];
-            } catch {
-                Log.Error("Could not load VOICEVOX singer.");
+            } catch (Exception e) {
+                var errorMessage = "Could not load VOICEVOX singer.";
+                Log.Error(errorMessage);
+                throw new VoicevoxException(errorMessage, e);
             }
+
             return new VoicevoxConfig();
         }
         public void LoadInfo(VoicevoxConfig voicevoxConfig, string location) {
@@ -162,48 +169,6 @@ namespace OpenUtau.Core.Voicevox {
                     File.WriteAllText(filePath, $"license:{item.license}\nversion:{item.version}\n\n" + item.text);
                 }
             }
-        }
-    }
-
-    public class Phoneme_list {
-        public string[] vowels;
-        public string[] consonants;
-        public string[] kana;
-    }
-
-    public class Dictionary_list {
-        public Dictionary<string, string> dict = new Dictionary<string, string>();
-
-        public void Loaddic(string location) {
-            try {
-                var parentDirectory = Directory.GetParent(location).ToString();
-                var yamlPath = Path.Join(parentDirectory, "dictionary.yaml");
-                if (File.Exists(yamlPath)) {
-                    var yamlTxt = File.ReadAllText(yamlPath);
-                    var yamlObj = Yaml.DefaultDeserializer.Deserialize<Dictionary<string, List<Dictionary<string, string>>>>(yamlTxt);
-                    var list = yamlObj["list"];
-                    dict = new Dictionary<string, string>();
-
-                    foreach (var item in list) {
-                        foreach (var pair in item) {
-                            dict[pair.Key] = pair.Value;
-                        }
-                    }
-
-                }
-            } catch (Exception e) {
-                Log.Error($"Failed to read dictionary file. : {e}");
-            }
-        }
-
-        public string Lyrictodic(Note[][] notes, int index) {
-            if (dict.TryGetValue(notes[index][0].lyric, out var lyric_)) {
-                if (string.IsNullOrEmpty(lyric_)) {
-                    return "";
-                }
-                return lyric_;
-            }
-            return notes[index][0].lyric;
         }
     }
 

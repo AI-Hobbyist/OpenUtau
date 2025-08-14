@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -18,6 +20,8 @@ namespace OpenUtau.Classic {
         public ResamplerManifest Manifest { get; private set; }
         readonly string _name;
         readonly bool _isLegalPlugin = false;
+        readonly string winePath;
+        readonly bool useWine;
 
 
         public ResamplerManifest LoadManifest() {
@@ -34,14 +38,49 @@ namespace OpenUtau.Classic {
             }
         }
 
+        void FixMoreConfig(string moreConfigPath) {
+            var lines = new List<string> { };
+            if (File.Exists(moreConfigPath)) {
+                lines = File.ReadAllLines(moreConfigPath).ToList();
+            }
+            for (int i = 0; i < lines.Count; i++) {
+                if (lines[i].StartsWith("resampler-compatibility")) {
+                    if(lines[i] == "resampler-compatibility on"){
+                        //moreconfig.txt is correct
+                        return;
+                    } else {
+                        lines[i] = "resampler-compatibility on";
+                        File.WriteAllLines(moreConfigPath, lines);
+                        return;
+                    }
+                }
+            }
+            lines.Add("resampler-compatibility on");
+            File.WriteAllLines(moreConfigPath, lines);
+        }
+
         public ExeResampler(string filePath, string basePath) {
             if (File.Exists(filePath)) {
                 FilePath = filePath;
                 _name = Path.GetRelativePath(basePath, filePath);
                 _isLegalPlugin = true;
             }
+            //Check if should use wine
+            string ext = Path.GetExtension(filePath).ToLower();
+            winePath = Preferences.Default.WinePath;
+            useWine = !OS.IsWindows() && !string.IsNullOrEmpty(winePath) && (ext == ".exe" || ext == ".bat");
             //Load Resampler Manifest
             Manifest = LoadManifest();
+            //Make moresampler happy
+            try{
+                if(Path.GetFileNameWithoutExtension(filePath) == "moresampler"){
+                    //Load moreconfig.txt under the same folder with filePath
+                    var moreConfigPath = Path.Combine(Path.GetDirectoryName(filePath), "moreconfig.txt");
+                    FixMoreConfig(moreConfigPath);
+                }
+            } catch (Exception ex){
+                Log.Error($"Failed fixing moreconfig.txt for {filePath}: {ex}");
+            }
         }
 
         public float[] DoResampler(ResamplerItem args, ILogger logger) {
@@ -63,7 +102,11 @@ namespace OpenUtau.Classic {
             string ArgParam = FormattableString.Invariant(
                 $"\"{args.inputTemp}\" \"{tmpFile}\" {MusicMath.GetToneName(args.tone)} {args.velocity} \"{args.GetFlagsString()}\" {args.offset} {args.durRequired} {args.consonant} {args.cutoff} {args.volume} {args.modulation} !{args.tempo} {Base64.Base64EncodeInt12(args.pitches)}");
             logger.Information($" > [thread-{threadId}] {FilePath} {ArgParam}");
-            ProcessRunner.Run(FilePath, ArgParam, logger);
+            if (useWine) {
+                ProcessRunner.Run(winePath, $"{FilePath} {ArgParam}", logger);
+            } else {
+                ProcessRunner.Run(FilePath, ArgParam, logger);
+            }
             return tmpFile;
         }
 

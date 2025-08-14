@@ -60,6 +60,7 @@ namespace OpenUtau.App.ViewModels {
             SelectSingerCommand = ReactiveCommand.Create<USinger>(singer => {
                 if (track.Singer != singer) {
                     DocManager.Inst.StartUndoGroup();
+                    Log.Information($"Loading Singer: {singer.Name}");
                     DocManager.Inst.ExecuteCmd(new TrackChangeSingerCommand(DocManager.Inst.Project, track, singer));
                     if (!string.IsNullOrEmpty(singer?.Id) &&
                         Preferences.Default.SingerPhonemizers.TryGetValue(Singer.Id, out var phonemizerName) &&
@@ -97,6 +98,7 @@ namespace OpenUtau.App.ViewModels {
                 if (track.Phonemizer.GetType() != factory.type) {
                     DocManager.Inst.StartUndoGroup();
                     var phonemizer = factory.Create();
+                    Log.Information($"Loading Phonemizer: {phonemizer.ToString()}");
                     DocManager.Inst.ExecuteCmd(new TrackChangePhonemizerCommand(DocManager.Inst.Project, track, phonemizer));
                     DocManager.Inst.EndUndoGroup();
                     var name = phonemizer.GetType().FullName!;
@@ -254,7 +256,7 @@ namespace OpenUtau.App.ViewModels {
                     CommandParameter = singer,
                 }));
             items.Add(new SingerMenuItemViewModel() {
-                Header = "Favourites ...",
+                Header = ThemeManager.GetString("tracks.favorite") + " ...",
                 Items = Preferences.Default.FavoriteSingers
                     .Select(id => SingerManager.Inst.Singers.Values.FirstOrDefault(singer => singer.Id == id))
                     .OfType<USinger>()
@@ -282,6 +284,44 @@ namespace OpenUtau.App.ViewModels {
             items.Add(new MenuItemViewModel() { // Separator
                 Header = "-",
                 Height = 1
+            });
+            items.Add(new MenuItemViewModel() {
+                Header = ThemeManager.GetString("tracks.installsinger"),
+                Command = ReactiveCommand.Create(async () => {
+                    var mainWindow = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)
+                        ?.MainWindow as MainWindow;
+                    if(mainWindow == null){
+                        return;
+                    }
+                    var file = await FilePicker.OpenFileAboutSinger(
+                        mainWindow, "menu.tools.singer.install", FilePicker.ArchiveFiles);
+                    if (file == null) {
+                        return;
+                    }
+                    try {
+                        if (file.EndsWith(Core.Vogen.VogenSingerInstaller.FileExt)) {
+                            Core.Vogen.VogenSingerInstaller.Install(file);
+                            return;
+                        }
+                        if (file.EndsWith(DependencyInstaller.FileExt)) {
+                            DependencyInstaller.Install(file);
+                            return;
+                        }
+
+                        var setup = new SingerSetupDialog() {
+                            DataContext = new SingerSetupViewModel() {
+                                ArchiveFilePath = file,
+                            },
+                        };
+                        _ = setup.ShowDialog(mainWindow);
+                        if (setup.Position.Y < 0) {
+                            setup.Position = setup.Position.WithY(0);
+                        }
+                    } catch (Exception e) {
+                        Log.Error(e, $"Failed to install singer {file}");
+                        _ = await MessageBox.ShowError(mainWindow, new MessageCustomizableException($"Failed to install singer {file}", $"<translate:errors.failed.installsinger>: {file}", e));
+                    }
+                })
             });
             items.Add(new MenuItemViewModel() {
                 Header = ThemeManager.GetString("tracks.opensingers"),
@@ -329,11 +369,27 @@ namespace OpenUtau.App.ViewModels {
             return key;
         }
 
+        PhonemizerFactory? FindPhonemizerByName(string name){
+            return DocManager.Inst.PhonemizerFactories.FirstOrDefault(
+                factory => factory.type.FullName == name);
+        }
+
         public void RefreshPhonemizers() {
             var items = new List<MenuItemViewModel>();
+            //Singer default
+            if (track != null && track.Singer != null && track.Singer.Found){
+                var factory = FindPhonemizerByName(track.Singer.DefaultPhonemizer);
+                if(factory != null){
+                    items.Add(new MenuItemViewModel() {
+                        Header = ThemeManager.GetString("tracks.singerdefault") + factory.ToString(),
+                        Command = SelectPhonemizerCommand,
+                        CommandParameter = factory,
+                    });
+                }
+            }
             //Recently used phonemizers
             items.AddRange(Preferences.Default.RecentPhonemizers
-                .Select(name => DocManager.Inst.PhonemizerFactories.FirstOrDefault(factory => factory.type.FullName == name))
+                .Select(name => FindPhonemizerByName(name))
                 .OfType<PhonemizerFactory>()
                 .OrderBy(factory => factory.tag)
                 .Select(factory => new MenuItemViewModel() {
