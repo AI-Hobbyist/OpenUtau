@@ -46,7 +46,7 @@ namespace OpenUtau.Core.DiffSinger {
         public Dictionary<string, int> languageIds = new Dictionary<string, int>();
         public DsConfig dsConfig;
         public ulong acousticHash;
-        public InferenceSession acousticSession = null;
+        public IOnnxInferenceSession acousticSession = null;
         public DsVocoder vocoder = null;
         public DsPitch pitchPredictor = null;
         public DiffSingerSpeakerEmbedManager speakerEmbedManager = null;
@@ -161,12 +161,11 @@ namespace OpenUtau.Core.DiffSinger {
                 : File.ReadAllBytes(Portrait);
         }
 
-        public InferenceSession getAcousticSession() {
+        public IOnnxInferenceSession getAcousticSession() {
             if (acousticSession is null) {
                 var acousticPath = Path.Combine(Location, dsConfig.acoustic);
-                var acousticBytes = File.ReadAllBytes(acousticPath);
-                acousticHash = XXH64.DigestOf(acousticBytes);
-                acousticSession = Onnx.getInferenceSession(acousticBytes);
+                acousticHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(acousticPath));
+                acousticSession = Onnx.getInferenceSession(acousticPath);
             }
             return acousticSession;
         }

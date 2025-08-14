@@ -10,6 +10,7 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenUtau.Api;
 using OpenUtau.Core.Ustx;
 using OpenUtau.Core.Util;
+using System.Text;
 
 namespace OpenUtau.Core.DiffSinger
 {
@@ -22,8 +23,8 @@ namespace OpenUtau.Core.DiffSinger
         float frameMs;
         ulong linguisticHash;
         ulong durationHash;
-        InferenceSession linguisticModel;
-        InferenceSession durationModel;
+        IOnnxInferenceSession linguisticModel;
+        IOnnxInferenceSession durationModel;
         IG2p g2p;
         Dictionary<string, int> phonemeTokens;
         DiffSingerSpeakerEmbedManager speakerEmbedManager;
@@ -91,17 +92,16 @@ namespace OpenUtau.Core.DiffSinger
             var linguisticModelPath = Path.Join(rootPath, dsConfig.linguistic);
             try {
                 var linguisticModelBytes = File.ReadAllBytes(linguisticModelPath);
-                linguisticHash = XXH64.DigestOf(linguisticModelBytes);
-                linguisticModel = new InferenceSession(linguisticModelBytes);
+                linguisticHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(linguisticModelPath));
+                linguisticModel = Onnx.getInferenceSession(linguisticModelPath);
             } catch (Exception e) {
                 Log.Error(e, $"failed to load linguistic model from {linguisticModelPath}");
                 return false;
             }
             var durationModelPath = Path.Join(rootPath, dsConfig.dur);
             try {
-                var durationModelBytes = File.ReadAllBytes(durationModelPath);
-                durationHash = XXH64.DigestOf(durationModelBytes);
-                durationModel = new InferenceSession(durationModelBytes);
+                durationHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(durationModelPath));
+                durationModel = Onnx.getInferenceSession(durationModelPath);
             } catch (Exception e) {
                 Log.Error(e, $"failed to load duration model from {durationModelPath}");
                 return false;

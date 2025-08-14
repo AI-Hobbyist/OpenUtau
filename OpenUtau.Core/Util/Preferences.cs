@@ -141,6 +141,7 @@ namespace OpenUtau.Core.Util {
             public string DefaultRenderer = string.Empty;
             public int WorldlineR = 0;
             public string OnnxRunner = string.Empty;
+            public string OnnxRemoteUrl = "http://localhost:7889";
             public int OnnxGpu = 0;
             public double DiffSingerDepth = 1.0;
             public int DiffSingerSteps = 20;

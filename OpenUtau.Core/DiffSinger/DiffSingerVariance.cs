@@ -26,8 +26,8 @@ namespace OpenUtau.Core.DiffSinger{
         Dictionary<string, int> phonemeTokens;
         ulong linguisticHash;
         ulong varianceHash;
-        InferenceSession linguisticModel;
-        InferenceSession varianceModel;
+        IOnnxInferenceSession linguisticModel;
+        IOnnxInferenceSession varianceModel;
         IG2p g2p;
         float frameMs;
         const float headMs = DiffSingerUtils.headMs;
@@ -70,12 +70,11 @@ namespace OpenUtau.Core.DiffSinger{
             }
             var linguisticModelPath = Path.Join(rootPath, dsConfig.linguistic);
             var linguisticModelBytes = File.ReadAllBytes(linguisticModelPath);
-            linguisticHash = XXH64.DigestOf(linguisticModelBytes);
-            linguisticModel = Onnx.getInferenceSession(linguisticModelBytes);
+            linguisticHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(linguisticModelPath));
+            linguisticModel = Onnx.getInferenceSession(linguisticModelPath);
             var varianceModelPath = Path.Join(rootPath, dsConfig.variance);
-            var varianceModelBytes = File.ReadAllBytes(varianceModelPath);
-            varianceHash = XXH64.DigestOf(varianceModelBytes);
-            varianceModel = Onnx.getInferenceSession(varianceModelBytes);
+            varianceHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(varianceModelPath));
+            varianceModel = Onnx.getInferenceSession(varianceModelPath);
             frameMs = 1000f * dsConfig.hop_size / dsConfig.sample_rate;
             //Load g2p
             g2p = LoadG2p(rootPath);

@@ -11,6 +11,8 @@ using OpenUtau.Core.Render;
 using OpenUtau.Core.Util;
 using Serilog;
 
+using System.Text;
+
 namespace OpenUtau.Core.DiffSinger
 {
     public class DsPitch : IDisposable
@@ -20,8 +22,8 @@ namespace OpenUtau.Core.DiffSinger
         Dictionary<string, int> languageIds = new Dictionary<string, int>();
         Dictionary<string, int> phonemeTokens;
         ulong linguisticHash;
-        InferenceSession linguisticModel;
-        InferenceSession pitchModel;
+        IOnnxInferenceSession linguisticModel;
+        IOnnxInferenceSession pitchModel;
         IG2p g2p;
         float frameMs;
         DiffSingerSpeakerEmbedManager speakerEmbedManager;
@@ -62,9 +64,8 @@ namespace OpenUtau.Core.DiffSinger
                 throw new Exception("Configuration key \"linguistic\" is null.");
             }
             var linguisticModelPath = Path.Join(rootPath, dsConfig.linguistic);
-            var linguisticModelBytes = File.ReadAllBytes(linguisticModelPath);
-            linguisticHash = XXH64.DigestOf(linguisticModelBytes);
-            linguisticModel = Onnx.getInferenceSession(linguisticModelBytes);
+            linguisticHash = XXH64.DigestOf(Encoding.UTF8.GetBytes(linguisticModelPath));
+            linguisticModel = Onnx.getInferenceSession(linguisticModelPath);
             var pitchModelPath = Path.Join(rootPath, dsConfig.pitch);
             pitchModel = Onnx.getInferenceSession(pitchModelPath);
             frameMs = 1000f * dsConfig.hop_size / dsConfig.sample_rate;

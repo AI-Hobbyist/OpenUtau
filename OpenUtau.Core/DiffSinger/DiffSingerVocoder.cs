@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using K4os.Hash.xxHash;
 using Microsoft.ML.OnnxRuntime;
 
@@ -8,7 +9,7 @@ namespace OpenUtau.Core.DiffSinger {
         public string Location;
         public DsVocoderConfig config;
         public ulong hash;
-        public InferenceSession session;
+        public IOnnxInferenceSession session;
 
         public int num_mel_bins => config.num_mel_bins;
         public int hop_size => config.hop_size;
@@ -23,13 +24,13 @@ namespace OpenUtau.Core.DiffSinger {
 
         //Get vocoder by package name
         public DsVocoder(string name) {
-            byte[] model;
+            //byte[] model;
             try {
                 Location = Path.Combine(PathManager.Inst.DependencyPath, name);
                 config = Core.Yaml.DefaultDeserializer.Deserialize<DsVocoderConfig>(
                     File.ReadAllText(Path.Combine(Location, "vocoder.yaml"),
                         System.Text.Encoding.UTF8));
-                model = File.ReadAllBytes(Path.Combine(Location, config.model));
+                //model = File.ReadAllBytes(Path.Combine(Location, config.model));
             }
             catch (Exception ex) {
                 throw new MessageCustomizableException(
@@ -39,8 +40,8 @@ namespace OpenUtau.Core.DiffSinger {
                     true,
                     new string[] { name, "https://github.com/xunmengshe/OpenUtau/wiki/Vocoders" });
             }
-            hash = XXH64.DigestOf(model);
-            session = Onnx.getInferenceSession(model);
+            hash = XXH64.DigestOf(Encoding.UTF8.GetBytes(Path.Combine(Location, config.model)));
+            session = Onnx.getInferenceSession(Path.Combine(Location, config.model));
         }
 
         public float frameMs() {

@@ -166,7 +166,7 @@ namespace OpenUtau.Core.Analysis.Some {
     }
 
     public class Some: IDisposable {
-        InferenceSession session;
+        IOnnxInferenceSession session;
         string Location;
         private bool disposedValue;
 
