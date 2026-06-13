@@ -190,6 +190,7 @@ namespace OpenUtau.Core {
             }
         }
 
+
         public void ExecuteCmd(UCommand cmd) {
             if (mainThread != Thread.CurrentThread) {
                 if (!(cmd is ProgressBarNotification)) {
