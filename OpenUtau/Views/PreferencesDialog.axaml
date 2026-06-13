@@ -329,9 +329,13 @@
             <TextBlock Text="{DynamicResource prefs.appearance.diffsingerlangcodehide}" HorizontalAlignment="Left" />
             <ToggleSwitch IsChecked="{Binding DiffSingerLangCodeHide}" />
           </Grid>
-          <Grid Margin="0,5,0,0">
+                    <Grid Margin="0,5,0,0">
             <TextBlock Text="{DynamicResource prefs.rendering.diffsingerpitchlocalretaking}" HorizontalAlignment="Left" />
             <ToggleSwitch IsChecked="{Binding DiffSingerLocalRetaking}" />
+          </Grid>
+          <Grid Margin="0,5,0,0">
+            <TextBlock Text="{DynamicResource prefs.diffsinger.renderphraseboundaries}" HorizontalAlignment="Left" />
+            <ToggleSwitch IsChecked="{Binding DiffSingerShowRenderPhraseBoundaries}" />
           </Grid>
         </StackPanel>
 

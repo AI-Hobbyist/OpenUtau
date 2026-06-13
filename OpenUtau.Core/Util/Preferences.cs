@@ -166,6 +166,7 @@ namespace OpenUtau.Core.Util {
             public int DiffSingerStepsPitch = 10;
             public bool DiffSingerTensorCache = true;
             public bool DiffSingerLangCodeHide = false;
+            public bool DiffSingerShowRenderPhraseBoundaries = false;
             public bool DiffSingerLocalRetaking = false;
             public bool SkipRenderingMutedTracks = false;
             public string Language = string.Empty;
