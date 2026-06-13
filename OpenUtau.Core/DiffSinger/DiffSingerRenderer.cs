@@ -508,6 +508,38 @@ namespace OpenUtau.Core.DiffSinger {
             }
         }
 
+        public RenderPitchResult LoadRenderedPitch(RenderPhrase phrase, HashSet<int> selectedNotePositions) {
+            if (!Preferences.Default.DiffSingerLocalRetaking) {
+                return LoadRenderedPitch(phrase);
+            }
+            DiffSingerSinger singer = (DiffSingerSinger) phrase.singer;
+            if (!singer.HasPitchPredictor) {
+                throw new Exception("This singer has no pitch predictor.");
+            }
+            var pitchPredictor = singer.getPitchPredictor()!;
+            var noteRelativePositions = new int[phrase.notes.Length];
+            for (int i = 0; i < phrase.notes.Length; i++) {
+                noteRelativePositions[i] = phrase.notes[i].position;
+            }
+            var retakeNoteIndexes = DiffSingerRetake.MapSelectedPositionsToNoteIndexes(
+                phrase.position, noteRelativePositions, selectedNotePositions);
+            if (retakeNoteIndexes.Count == 0 || retakeNoteIndexes.Count == phrase.notes.Length) {
+                lock (pitchPredictor) {
+                    return pitchPredictor.Process(phrase);
+                }
+            }
+            var frameMs = pitchPredictor.FrameMs;
+            int headFrames = DiffSingerUtils.headFrames;
+            int tailFrames = DiffSingerUtils.tailFrames;
+            var ph_dur = DiffSingerUtils.PaddedPhoneDurations(phrase, frameMs, headFrames, tailFrames);
+            int totalFrames = ph_dur.Sum();
+            var existingPitch = DiffSingerUtils.SampleCurve(phrase, phrase.pitches, 0, frameMs, totalFrames, headFrames, tailFrames,
+                x => x * 0.01).Select(f => (float)f).ToArray();
+            lock (pitchPredictor) {
+                return pitchPredictor.Process(phrase, retakeNoteIndexes, existingPitch);
+            }
+        }
+
         public List<RenderRealCurveResult> LoadRenderedRealCurves(RenderPhrase phrase) {
             if (!Preferences.Default.DiffSingerTensorCache) {
                 throw new Exception("Please enable DiffSinger tensor cache and re-render the phrase to display correct base curves.");
