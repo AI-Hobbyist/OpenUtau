@@ -47,12 +47,22 @@ namespace OpenUtau.Core.Render {
         readonly int startTick;
         readonly int endTick;
         readonly int trackNo;
+        readonly UVoicePart focusPart;
+        readonly int focusTick;
 
-        public RenderEngine(UProject project, int startTick = 0, int endTick = -1, int trackNo = -1) {
+        public RenderEngine(
+            UProject project,
+            int startTick = 0,
+            int endTick = -1,
+            int trackNo = -1,
+            UVoicePart focusPart = null,
+            int focusTick = -1) {
             this.project = project;
             this.startTick = startTick;
             this.endTick = endTick;
             this.trackNo = trackNo;
+            this.focusPart = focusPart;
+            this.focusTick = focusTick;
         }
 
         // for playback or export
@@ -238,15 +248,15 @@ namespace OpenUtau.Core.Render {
             }
             var tuples = requests
                 .SelectMany(req => req.phrases
-                    .Zip(req.sources, (phrase, source) => Tuple.Create(phrase, source, req)))
+                    .Zip(req.sources, (phrase, source) => (phrase, source, request: req)))
                 .ToArray();
+            if (tuples.Length == 0) {
+                return;
+            }
             if (playing) {
-                var orderedTuples = tuples
-                    .Where(tuple => tuple.Item1.end > startTick)
-                    .OrderBy(tuple => tuple.Item1.end)
-                    .Concat(tuples.Where(tuple => tuple.Item1.end <= startTick))
-                    .ToArray();
-                tuples = orderedTuples;
+                tuples = OrderForPlayback(tuples);
+            } else if (focusPart != null || focusTick >= 0) {
+                tuples = OrderForPreRender(tuples);
             }
             var progress = new Progress(tuples.Sum(t => t.Item1.phones.Length));
             foreach (var tuple in tuples) {
@@ -259,7 +269,7 @@ namespace OpenUtau.Core.Render {
                         realCurvesPublished = PublishRealCurveUpdates(request.part, phrase, realCurves);
                     })
                     : null;
-                var task = phrase.renderer.Render(phrase, progress, request.trackNo, cancellation, true, renderEvents);
+                var task = phrase.renderer.Render(phrase, progress, request.trackNo, cancellation, true);
                 task.Wait();
                 if (cancellation.IsCancellationRequested) {
                     break;
@@ -277,7 +287,49 @@ namespace OpenUtau.Core.Render {
             }
             progress.Clear();
         }
+        private (RenderPhrase phrase, WaveSource source, RenderPartRequest request)[] OrderForPlayback(
+            (RenderPhrase phrase, WaveSource source, RenderPartRequest request)[] tuples) {
+            double playbackStartMs = project.timeAxis.TickPosToMsPos(startTick);
+            return tuples
+                .Select((tuple, index) => (tuple, index))
+                .OrderBy(item => RenderPriority.PlaybackBucket(
+                    item.tuple.source.offsetMs, item.tuple.source.EndMs, playbackStartMs))
+                .ThenBy(item => RenderPriority.PlaybackDistance(
+                    item.tuple.source.offsetMs, item.tuple.source.EndMs, playbackStartMs))
+                .ThenBy(item => item.index)
+                .Select(item => item.tuple)
+                .ToArray();
+        }
 
+        private (RenderPhrase phrase, WaveSource source, RenderPartRequest request)[] OrderForPreRender(
+            (RenderPhrase phrase, WaveSource source, RenderPartRequest request)[] tuples) {
+            return tuples
+                .Select((tuple, index) => (tuple, index))
+                .OrderBy(item => PreRenderAttentionBucket(item.tuple))
+                .ThenBy(item => PreRenderAttentionDistance(item.tuple.phrase))
+                .ThenBy(item => item.index)
+                .Select(item => item.tuple)
+                .ToArray();
+        }
+
+        private int PreRenderAttentionBucket(
+            (RenderPhrase phrase, WaveSource source, RenderPartRequest request) tuple) {
+            bool isPriorityPart = focusPart != null && ReferenceEquals(tuple.request.part, focusPart);
+            bool overlapsPriority = focusTick >= 0 &&
+                tuple.phrase.position <= focusTick &&
+                tuple.phrase.end > focusTick;
+            bool isAfterPriorityStart = focusTick < 0 || tuple.phrase.end > focusTick;
+            return RenderPriority.PreRenderBucket(
+                isPriorityPart,
+                overlapsPriority,
+                isAfterPriorityStart);
+        }
+
+        private int PreRenderAttentionDistance(RenderPhrase phrase) {
+            return focusTick >= 0
+                ? RenderPriority.PreRenderDistance(phrase.position, phrase.end, focusTick)
+                : 0;
+        }
         private bool PublishRealCurveUpdates(UVoicePart part, RenderPhrase phrase) {
             if (!phrase.renderer.SupportsRealCurve) {
                 return false;
@@ -312,7 +364,6 @@ namespace OpenUtau.Core.Render {
             }
             return false;
         }
-
         public static void ReleaseSourceTemp() {
             VoicebankFiles.Inst.ReleaseSourceTemp();
         }
