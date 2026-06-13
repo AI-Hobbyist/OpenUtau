@@ -1,4 +1,5 @@
-
+# 关于本分支
+该分支主要是用于提前合并可能有用的pr供用户提前体验上游新功能
 # OpenUtau
 
 OpenUtau is a free, open-source editor made for the UTAU community.
